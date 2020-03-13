@@ -6,11 +6,13 @@
 package Client;
 
 import frames.Register;
+import java.awt.Font;
 import java.awt.event.KeyEvent;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
 import javax.swing.ImageIcon;
+import org.jdesktop.xswingx.PromptSupport;
 
 /**
  *
@@ -36,7 +38,13 @@ public class Login extends javax.swing.JFrame {
 
     public Login() {
         initComponents();
+//        PromptSupport.setPrompt("Enter Username", txt_user);
+//        PromptSupport.setPrompt("Enter Password", txt_pwd);
 
+//        PromptSupport.setFontStyle(Font.BOLD, txt_user);
+//        PromptSupport.setFontStyle(Font.BOLD, txt_pwd);
+        
+        
     }
 
     public ImageIcon getImageIcon() {
@@ -92,6 +100,7 @@ public class Login extends javax.swing.JFrame {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Client Login");
+        setResizable(false);
 
         jPanel1.setBackground(new java.awt.Color(0, 153, 102));
 
@@ -99,10 +108,13 @@ public class Login extends javax.swing.JFrame {
 
         jPanel2.setBackground(new java.awt.Color(0, 204, 102));
 
+        txt_user.setFont(new java.awt.Font("Arial", 1, 12)); // NOI18N
+
         jLabel5.setFont(new java.awt.Font("Verdana", 1, 12)); // NOI18N
         jLabel5.setForeground(new java.awt.Color(255, 255, 255));
         jLabel5.setText("Password");
 
+        txt_pwd.setFont(new java.awt.Font("Arial", 1, 12)); // NOI18N
         txt_pwd.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyPressed(java.awt.event.KeyEvent evt) {
                 txt_pwdKeyPressed(evt);

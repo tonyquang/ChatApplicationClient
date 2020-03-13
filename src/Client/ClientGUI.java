@@ -6,25 +6,41 @@
 package Client;
 
 import ClientsObject.ObjectClients;
+import frames.ImgInChat;
 import frames.ListFriends;
+import frames.viewFile;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridLayout;
 import java.awt.Image;
+import java.awt.Insets;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
+import javax.swing.JLayeredPane;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JTextPane;
+import javax.swing.OverlayLayout;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.Style;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.StyledDocument;
 
 /**
  *
@@ -33,7 +49,8 @@ import javax.swing.JPanel;
 public class ClientGUI extends javax.swing.JFrame {
 
     private String currentFriendUserName = "";
-
+    private int lineChat = 0;
+    private int colChat = 0;
     private final String address = "127.0.0.1";
     private final int port = 14049;
     private Socket sock = null;
@@ -111,18 +128,18 @@ public class ClientGUI extends javax.swing.JFrame {
 
                     } else if (status.equals("friend")) {
                         loadFriends(objServerResp);
-                         ListFriends firstFriend = (ListFriends) panel_ListFriends.getComponent(0);
-                         initChat(firstFriend);
+                        ListFriends firstFriend = (ListFriends) panel_ListFriends.getComponent(0);
+                        initChat(firstFriend);
                     } else if (status.equals("profile")) {
                         loadProfile(objServerResp);
                     } else if (status.equals("updateFriendStatus")) {
                         updateStatusFriend(userName, userStatus);
                         if (currentFriendUserName.equals(userName)) {
-                            setUserStatus(userStatus);                           
+                            setUserStatus(userStatus);
                         }
                     } else if (status.equals("resAddfriends") || status.equals("pushfriendtolist")) {
                         if (objServerResp.getMessage().equals("success")) {
-                            
+
                             ListFriends addFriend = new ListFriends();
                             addFriend.set(imgIcon, userName, fullName, userStatus);
                             addFriend.setVisible(true);
@@ -142,6 +159,8 @@ public class ClientGUI extends javax.swing.JFrame {
                         } else {
                             JOptionPane.showMessageDialog(null, "Can't find username or username was friend!", "Notification", JOptionPane.INFORMATION_MESSAGE);
                         }
+                    } else if (status.equals("resMess")) {
+                        hanldeTxtMess(objServerResp);
                     }
 
                 }
@@ -156,7 +175,7 @@ public class ClientGUI extends javax.swing.JFrame {
     }
 
     public void resetPanelListFriends(JPanel jpanel) {
-        jpanel.validate();
+        jpanel.revalidate();
         jpanel.repaint();
     }
 
@@ -178,7 +197,7 @@ public class ClientGUI extends javax.swing.JFrame {
     }
 
     //Lấy người đầu tiên trong list friends làm currentFriendUserName
-    public void initChat(ListFriends FisrtFriends) {     
+    public void initChat(ListFriends FisrtFriends) {
         label_yourFriendName.setText(FisrtFriends.getFullName());
         setAva(label_avaYourFriends1, FisrtFriends.getAva(), 40);
         setUserStatus(FisrtFriends.getUserStatus());
@@ -187,8 +206,7 @@ public class ClientGUI extends javax.swing.JFrame {
     }
 
     //Set style cho status
-    public void setUserStatus(String status)
-    {
+    public void setUserStatus(String status) {
         if (status.equals("Online")) {
             label_yourFriendStatus.setForeground(Color.GREEN);
         } else {
@@ -197,9 +215,9 @@ public class ClientGUI extends javax.swing.JFrame {
         label_yourFriendStatus.setFont(new Font("Arial", Font.BOLD, 12));
         label_yourFriendStatus.setText(status);
     }
+
     //set avatar
-    public void setAva(JLabel ava,ImageIcon imgIcon, int px)
-    {
+    public void setAva(JLabel ava, ImageIcon imgIcon, int px) {
         Image img;
         if (imgIcon.getIconWidth() > imgIcon.getIconHeight()) {
             img = imgIcon.getImage().getScaledInstance(px, -1, Image.SCALE_SMOOTH);
@@ -208,7 +226,7 @@ public class ClientGUI extends javax.swing.JFrame {
         }
         ava.setIcon(new ImageIcon(img));
     }
-    
+
     // add event cho mỗi jpanel user 
     public void addMouseEventListFriends(ListFriends friend, String friendUserName, String friendName, String friendStatus, ImageIcon imgIcon) {
         friend.addMouseListener(new MouseAdapter() {
@@ -217,12 +235,26 @@ public class ClientGUI extends javax.swing.JFrame {
                 label_yourFriendName.setText(friendName);
                 setUserStatus(friendStatus);
                 setAva(label_avaYourFriends1, imgIcon, 40);
-                 listFriends.get(friendUserName).setBgClicked();
-                 listFriends.get(currentFriendUserName.trim()).RemoveBg();
+                listFriends.get(friendUserName).setBgClicked();
+                listFriends.get(currentFriendUserName.trim()).RemoveBg();
                 currentFriendUserName = friendUserName;
+                getMess(currentFriendUserName);
             }
 
         });
+    }
+
+    public void getMess(String friend) {
+        ObjectClients objGetMess = new ObjectClients();
+        objGetMess.setStatus("getMess");
+        objGetMess.setUserNameSend(this.userName);
+        objGetMess.setUserNameRecv(friend);
+        try {
+            oos.writeObject(objGetMess);
+            oos.flush();
+        } catch (IOException ex) {
+            Logger.getLogger(ClientGUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     //Update status list friends every time friend on/off
@@ -262,7 +294,7 @@ public class ClientGUI extends javax.swing.JFrame {
         jLabel3 = new javax.swing.JLabel();
         jLabel4 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
-        scollPane_ChatLog = new javax.swing.JScrollPane();
+        scollpane_ChatLog = new javax.swing.JScrollPane();
         panel_ChatLog = new javax.swing.JPanel();
         panel_Message = new javax.swing.JPanel();
         label_moreFeature = new javax.swing.JLabel();
@@ -436,16 +468,16 @@ public class ClientGUI extends javax.swing.JFrame {
 
         panel_Right.add(panel_topBar);
 
-        scollPane_ChatLog.setBorder(null);
-        scollPane_ChatLog.setHorizontalScrollBarPolicy(javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        scollPane_ChatLog.setPreferredSize(new java.awt.Dimension(841, 500));
+        scollpane_ChatLog.setBackground(new java.awt.Color(255, 255, 255));
+        scollpane_ChatLog.setBorder(null);
 
         panel_ChatLog.setBackground(new java.awt.Color(255, 255, 255));
-        panel_ChatLog.setPreferredSize(new java.awt.Dimension(600, 400));
-        panel_ChatLog.setLayout(new javax.swing.BoxLayout(panel_ChatLog, javax.swing.BoxLayout.LINE_AXIS));
-        scollPane_ChatLog.setViewportView(panel_ChatLog);
+        panel_ChatLog.setMaximumSize(new java.awt.Dimension(30000, 30000));
+        panel_ChatLog.setPreferredSize(new java.awt.Dimension(600, 100));
+        panel_ChatLog.setLayout(new javax.swing.BoxLayout(panel_ChatLog, javax.swing.BoxLayout.Y_AXIS));
+        scollpane_ChatLog.setViewportView(panel_ChatLog);
 
-        panel_Right.add(scollPane_ChatLog);
+        panel_Right.add(scollpane_ChatLog);
 
         panel_Message.setBackground(new java.awt.Color(255, 255, 255));
         panel_Message.setMaximumSize(new java.awt.Dimension(32767, 60));
@@ -466,6 +498,11 @@ public class ClientGUI extends javax.swing.JFrame {
         txt_WriteMessage.setMaximumSize(new java.awt.Dimension(2147483647, 20));
         txt_WriteMessage.setMinimumSize(new java.awt.Dimension(2, 20));
         txt_WriteMessage.setPreferredSize(new java.awt.Dimension(2, 20));
+        txt_WriteMessage.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyPressed(java.awt.event.KeyEvent evt) {
+                txt_WriteMessageKeyPressed(evt);
+            }
+        });
 
         javax.swing.GroupLayout panel_WriteMessageLayout = new javax.swing.GroupLayout(panel_WriteMessage);
         panel_WriteMessage.setLayout(panel_WriteMessageLayout);
@@ -480,7 +517,7 @@ public class ClientGUI extends javax.swing.JFrame {
             panel_WriteMessageLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(panel_WriteMessageLayout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(txt_WriteMessage, javax.swing.GroupLayout.DEFAULT_SIZE, 37, Short.MAX_VALUE)
+                .addComponent(txt_WriteMessage, javax.swing.GroupLayout.DEFAULT_SIZE, 38, Short.MAX_VALUE)
                 .addContainerGap())
         );
 
@@ -489,6 +526,11 @@ public class ClientGUI extends javax.swing.JFrame {
         btn_SendMessage.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Image/send.png"))); // NOI18N
         btn_SendMessage.setToolTipText("Send Message");
         btn_SendMessage.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btn_SendMessage.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                btn_SendMessageMouseClicked(evt);
+            }
+        });
         panel_Message.add(btn_SendMessage);
 
         panel_Right.add(panel_Message);
@@ -566,6 +608,176 @@ public class ClientGUI extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_label_addFriendsMouseClicked
 
+    public String splitMess(String Mess) {
+        int charPerLine = 65;
+        Mess += " ";
+        String splMess = "";
+        int line = 1;
+
+        int messLength = Mess.length();
+        if (messLength <= charPerLine) {
+            return String.valueOf(line) + Mess;
+        } else {
+            int flag = 0;
+            while ((flag != messLength)) {
+                if (messLength - flag <= charPerLine) {
+                    splMess += Mess.substring(flag).trim();
+                    return String.valueOf(line) + splMess;
+                }
+                String temp = Mess.substring(flag, flag + charPerLine);
+                int indexSpace = temp.lastIndexOf(" ");
+                if (indexSpace != -1) {
+                    splMess += temp.substring(0, indexSpace) + "\n";
+                    flag += indexSpace + 1;
+                } else {
+                    splMess += temp + "\n";;
+                    flag = flag + charPerLine + 1;
+                }
+                line++;
+            }
+        }
+        return String.valueOf(line) + splMess;
+    }
+
+    public JPanel myMess(ObjectClients objMess) {
+        String Mess = objMess.getMessage();
+        String sign = Character.toString(Mess.charAt(0));
+        String username = objMess.getUserNameRecv().trim();
+        JTextPane textPane = null;
+        ImgInChat imgInChat = null;
+        viewFile vF = null;
+        int height = 40;
+        int width = 200;
+        //Xử lý gói message
+        if (sign.equals("M")) {
+            textPane = new JTextPane();
+            textPane.setEditable(false);
+            StyledDocument doc = textPane.getStyledDocument();
+            String rs = splitMess(Mess);
+            Mess = rs.substring(2).trim();
+            //SET STYLE FOR USERNAME
+            Style style = textPane.addStyle("I'm a Style", null);
+
+            //SET STYLE FOR MESS
+            StyleConstants.setFontFamily(style, "Arial");
+            StyleConstants.setBold(style, true);
+            StyleConstants.setFontSize(style, 20);
+            StyleConstants.setForeground(style, new Color(19, 51, 55));
+            try {
+                doc.insertString(doc.getLength(), Mess.trim(), style);
+            } catch (BadLocationException e) {
+            }
+            height = (int) Math.round(textPane.getPreferredSize().getHeight());
+            width = (int) Math.round(textPane.getPreferredSize().getWidth());
+            textPane.setMaximumSize(textPane.getPreferredSize());
+        } else if (sign.equals("P")) {
+            imgInChat = new ImgInChat();
+            ImageIcon imgIcon = new ImageIcon(objMess.getFile());
+            if (imgIcon != null) {
+                imgInChat.setImage(imgIcon);
+            }
+        } else if (sign.equals("F")) {
+            vF = new viewFile(objMess.getFile(), objMess.getMessage());
+        }
+        //Xử lý gói message XONG
+
+        //Xử lý ava
+        JLabel ava = null;
+        if (username.equals(this.userName)) {
+            ava = new JLabel(label_myAvaProfile1.getIcon());
+        } else {
+            ava = new JLabel(label_avaYourFriends1.getIcon());
+        }
+        JLabel borderAva = new JLabel(border_label_avaYourFriends.getIcon());
+        if (height < 40) {
+            ava.setPreferredSize(new Dimension(40, 40));
+            borderAva.setPreferredSize(new Dimension(40, 40));
+        } else {
+            ava.setPreferredSize(new Dimension(40, height));
+            borderAva.setPreferredSize(new Dimension(40, height));
+        }
+        JLayeredPane lpAva = new JLayeredPane();
+        lpAva.setLayout(new OverlayLayout(lpAva));
+        lpAva.add(borderAva);
+        lpAva.add(ava);
+        //Xử lý ava XONG
+
+        //=======Xử lý thêm vào ô chat===========
+        //====tạo mới jpanel==========
+        JPanel panelChat = new JPanel();
+        panelChat.setLayout(new BoxLayout(panelChat, BoxLayout.X_AXIS));
+        panelChat.setBackground(Color.WHITE);
+        //panelChat.setPreferredSize(new Dimension(width + 40, height));
+       // panelChat.setMinimumSize(new Dimension(width + 40, height));
+        panelChat.setMaximumSize(new Dimension(30000, height));
+        //====tạo mới jpanel XONG==========
+
+        //So sánh căn lề
+        //Nếu là tôi thì căn lề phải
+        //Nếu là bạn thì căn lề trái
+        if (username.equals(this.userName)) {
+            panelChat.add(Box.createHorizontalGlue());
+            //xử lý add loại mess nào vào
+            
+            if (sign.equals("M")) {
+                panelChat.add(textPane);
+            } else if (sign.equals("P")) {
+                panelChat.add(imgInChat);
+            } else if (sign.equals("F")) {
+                panelChat.add(vF);
+            }
+            panelChat.add(lpAva);
+        } else if (username.equals(currentFriendUserName)) {
+            panelChat.add(lpAva);
+            //xử lý add loại mess nào vào
+            if (sign.equals("M")) {
+                panelChat.add(textPane);
+            } else if (sign.equals("P")) {
+                panelChat.add(imgInChat);
+            } else if (sign.equals("F")) {
+                panelChat.add(vF);
+            }
+            panelChat.add(Box.createHorizontalGlue());
+
+        }
+
+        resetPanelListFriends(panelChat);
+        return panelChat;
+
+    }
+
+    public void hanldeTxtMess(ObjectClients objMess) {
+       
+        JPanel panelChat = new JPanel();
+        panelChat = myMess(objMess);
+        if (panelChat != null) {
+            panel_ChatLog.add(panelChat);
+            panel_ChatLog.add(Box.createVerticalStrut(20));
+        }
+
+        resetPanelListFriends(panel_ChatLog);
+    }
+
+    private void btn_SendMessageMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_btn_SendMessageMouseClicked
+        sendMess();
+    }//GEN-LAST:event_btn_SendMessageMouseClicked
+
+    private void txt_WriteMessageKeyPressed(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txt_WriteMessageKeyPressed
+        if (evt.getKeyCode() == KeyEvent.VK_ENTER) {
+            sendMess();
+        }
+    }//GEN-LAST:event_txt_WriteMessageKeyPressed
+
+    public void sendMess() {
+//        String messSend = txt_WriteMessage.getText().trim();
+//        if (messSend.equals("")) {
+//            JOptionPane.showMessageDialog(null, "Message emptry!!!", "ERROR!!!", JOptionPane.ERROR_MESSAGE);
+//            return;
+//        }
+//        hanldeTxtMess(messSend);
+//        txt_WriteMessage.setText("");
+    }
+
     /**
      * @param args the command line arguments
      */
@@ -600,8 +812,8 @@ public class ClientGUI extends javax.swing.JFrame {
     private javax.swing.JPanel panel_line;
     private javax.swing.JPanel panel_searchFriends;
     private javax.swing.JPanel panel_topBar;
-    private javax.swing.JScrollPane scollPane_ChatLog;
     private javax.swing.JScrollPane scollPane_ListFriends;
+    private javax.swing.JScrollPane scollpane_ChatLog;
     private javax.swing.JTextField txt_WriteMessage;
     private javax.swing.JTextField txt_searchFriends;
     // End of variables declaration//GEN-END:variables
