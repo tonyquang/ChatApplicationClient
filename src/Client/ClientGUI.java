@@ -9,15 +9,13 @@ import ClientsObject.ObjectClients;
 import frames.ImgInChat;
 import frames.ListFriends;
 import frames.viewFile;
+import java.awt.Adjustable;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridLayout;
 import java.awt.Image;
-import java.awt.Insets;
+import java.awt.event.AdjustmentEvent;
+import java.awt.event.AdjustmentListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -25,9 +23,13 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -35,9 +37,13 @@ import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
 import javax.swing.JTextPane;
 import javax.swing.OverlayLayout;
+import javax.swing.UIManager;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
@@ -49,22 +55,25 @@ import javax.swing.text.StyledDocument;
 public class ClientGUI extends javax.swing.JFrame {
 
     private String currentFriendUserName = "";
-    private int lineChat = 0;
-    private int colChat = 0;
+    private boolean soundStatus = false;
+    
     private final String address = "127.0.0.1";
     private final int port = 14049;
     private Socket sock = null;
     private ObjectInputStream ois = null;
     private ObjectOutputStream oos = null;
 
-    private String fullName;
+    
+    
     private String userName;
     private String passWord;
 
+    //Tạo lưu danh sách bạn bè
     private HashMap<String, ListFriends> listFriends = null;
 
     public ClientGUI(String userName, String passWord) {
         initComponents();
+        
         try {
             this.sock = new Socket(address, port);
             this.userName = userName;
@@ -86,9 +95,30 @@ public class ClientGUI extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(null, "Connect to Server Error!");
             System.exit(0);
         }
+        
+        
 
     }
 
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public String getCurrentFriendUserName() {
+        return currentFriendUserName;
+    }
+
+    public void setCurrentFriendUserName(String currentFriendUserName) {
+        this.currentFriendUserName = currentFriendUserName;
+    }
+
+    
+    
+    
     public class clientWorker implements Runnable {
 
         Socket sock;
@@ -115,6 +145,7 @@ public class ClientGUI extends javax.swing.JFrame {
                     String fullName = objServerResp.getFullName();
                     String userStatus = objServerResp.getUserStatus();
                     ImageIcon imgIcon = objServerResp.getAvatar();
+                    //Nhận phản hồi login
                     if (status.equals("resLogin")) {
                         String rs = objServerResp.getMessage();
                         if (rs.equals("fail")) {
@@ -122,21 +153,36 @@ public class ClientGUI extends javax.swing.JFrame {
                             Login login = new Login();
                             login.setVisible(true);
                         } else {
-                            JOptionPane.showMessageDialog(null, "Login Success! Welcome to Meow~~~ App", "Login success", JOptionPane.INFORMATION_MESSAGE);
+                            JOptionPane.showMessageDialog(null, "Login Success! Welcome to Meow~~~ App", "Login success", JOptionPane.INFORMATION_MESSAGE);                          
                             this.clientGUI.setVisible(true);
-                        }
 
+                            Thread t = new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        Thread.sleep(1000);
+                                    } catch (InterruptedException ex) {
+                                        Logger.getLogger(ClientGUI.class.getName()).log(Level.SEVERE, null, ex);
+                                    }
+                                    ListFriends firstFriend = (ListFriends) panel_ListFriends.getComponent(0);
+                                    initChat(firstFriend);
+                                }
+                            });
+                            t.run();
+                        }
+                    //Nhận phản hồi lấy danh sách bạn bè
                     } else if (status.equals("friend")) {
-                        loadFriends(objServerResp);
-                        ListFriends firstFriend = (ListFriends) panel_ListFriends.getComponent(0);
-                        initChat(firstFriend);
+                        loadFriends(objServerResp);                      
+                    //Nhận phản hồi lấy thông tin cá nhân của mình    
                     } else if (status.equals("profile")) {
                         loadProfile(objServerResp);
+                    //Nhận  phản hồi cập nhật trạng thái của bạn bè
                     } else if (status.equals("updateFriendStatus")) {
                         updateStatusFriend(userName, userStatus);
                         if (currentFriendUserName.equals(userName)) {
                             setUserStatus(userStatus);
                         }
+                    //Nhận phản hồi thêm bạn bè hoặc được bạn bè thêm    
                     } else if (status.equals("resAddfriends") || status.equals("pushfriendtolist")) {
                         if (objServerResp.getMessage().equals("success")) {
 
@@ -159,8 +205,18 @@ public class ClientGUI extends javax.swing.JFrame {
                         } else {
                             JOptionPane.showMessageDialog(null, "Can't find username or username was friend!", "Notification", JOptionPane.INFORMATION_MESSAGE);
                         }
-                    } else if (status.equals("resMess")) {
-                        hanldeTxtMess(objServerResp);
+                    //Nhận phản hồi lấy danh sách tin nhắn của bạn bè    
+                    } else if (status.equals("resMess")) {                       
+                            hanldeMess(objServerResp);                      
+                    } else if(status.equals("newMess")){
+                        if(!userName.trim().equals(currentFriendUserName))
+                        {
+                            listFriends.get(userName.trim()).setLabel_notification();
+                            playSound();
+                        }else
+                        {
+                            hanldeMess(objServerResp);
+                        }
                     }
 
                 }
@@ -173,17 +229,40 @@ public class ClientGUI extends javax.swing.JFrame {
         }
 
     }
-
+    
+    
+    //Nhạc nền nhận được tin nhắn mới
+    public void playSound() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    URL url = getClass().getResource("/sound/soundRecvNewMess.wav");
+                    System.out.println(url);
+                    AudioInputStream audioIn = AudioSystem.getAudioInputStream(url);
+                    Clip clip = AudioSystem.getClip();
+                    clip.open(audioIn);
+                    clip.start();
+                } catch (Exception e) {
+                }
+            }
+        }).start();
+    }
+    
+    
+    //Vẽ lại JPanel
     public void resetPanelListFriends(JPanel jpanel) {
         jpanel.revalidate();
         jpanel.repaint();
     }
 
+    //set thông tin của tôi
     public void loadProfile(ObjectClients objMe) {
         setAva(label_myAvaProfile1, objMe.getAvatar(), 40);
         this.label_myName.setText(objMe.getFullName());
     }
 
+    //Tải list friends
     public void loadFriends(ObjectClients objNewFriend) {
         ListFriends friend = new ListFriends();
         listFriends.put(objNewFriend.getUserNameRecv().trim(), friend);
@@ -197,12 +276,13 @@ public class ClientGUI extends javax.swing.JFrame {
     }
 
     //Lấy người đầu tiên trong list friends làm currentFriendUserName
-    public void initChat(ListFriends FisrtFriends) {
-        label_yourFriendName.setText(FisrtFriends.getFullName());
-        setAva(label_avaYourFriends1, FisrtFriends.getAva(), 40);
-        setUserStatus(FisrtFriends.getUserStatus());
-        this.currentFriendUserName = FisrtFriends.getFriendUserName();
-        FisrtFriends.setBgClicked();
+    public void initChat(ListFriends FisrtFriend) {
+        label_yourFriendName.setText(FisrtFriend.getFullName());
+        setAva(label_avaYourFriends1, FisrtFriend.getAva(), 40);
+        setUserStatus(FisrtFriend.getUserStatus());
+        this.currentFriendUserName = FisrtFriend.getFriendUserName().trim();
+        FisrtFriend.setBgClicked();
+        getMess(this.currentFriendUserName.trim());
     }
 
     //Set style cho status
@@ -232,18 +312,39 @@ public class ClientGUI extends javax.swing.JFrame {
         friend.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                label_yourFriendName.setText(friendName);
-                setUserStatus(friendStatus);
-                setAva(label_avaYourFriends1, imgIcon, 40);
-                listFriends.get(friendUserName).setBgClicked();
-                listFriends.get(currentFriendUserName.trim()).RemoveBg();
-                currentFriendUserName = friendUserName;
-                getMess(currentFriendUserName);
+                if (!friendUserName.trim().equals(currentFriendUserName.trim())) {
+                    label_yourFriendName.setText(friendName);
+                    setUserStatus(friendStatus);
+                    setAva(label_avaYourFriends1, imgIcon, 40);
+                    listFriends.get(friendUserName).setBgClicked();
+                    listFriends.get(currentFriendUserName.trim()).RemoveBg();
+                    currentFriendUserName = friendUserName;
+                    listFriends.get(currentFriendUserName.trim()).removeNotification();
+                    panel_ChatLog.removeAll();
+                    resetPanelListFriends(panel_ChatLog);
+                    getMess(currentFriendUserName);//yêu cầu lấy tin nhắn của bạn bè khi click vào
+                }
+
             }
 
         });
     }
 
+    //Kéo thanh cuộn xuống cuối
+    public void scrollToBottom(JScrollPane scrollPane) {
+        JScrollBar verticalBar = scrollPane.getVerticalScrollBar();
+        AdjustmentListener downScroller = new AdjustmentListener() {
+            @Override
+            public void adjustmentValueChanged(AdjustmentEvent e) {
+                Adjustable adjustable = e.getAdjustable();
+                adjustable.setValue(adjustable.getMaximum());
+                verticalBar.removeAdjustmentListener(this);
+            }
+        };
+        verticalBar.addAdjustmentListener(downScroller);
+    }
+    
+    //Yêu cầu server gửi mess theo tên người bạn
     public void getMess(String friend) {
         ObjectClients objGetMess = new ObjectClients();
         objGetMess.setStatus("getMess");
@@ -257,7 +358,7 @@ public class ClientGUI extends javax.swing.JFrame {
         }
     }
 
-    //Update status list friends every time friend on/off
+    //Cập nhật trạng thái của bạn bè online/offline
     public void updateStatusFriend(String friendUserName, String status) {
         ListFriends f = listFriends.get(friendUserName);
         f.updateStatus(status);
@@ -294,7 +395,7 @@ public class ClientGUI extends javax.swing.JFrame {
         jLabel3 = new javax.swing.JLabel();
         jLabel4 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
-        scollpane_ChatLog = new javax.swing.JScrollPane();
+        scollPanel_ChatLog = new javax.swing.JScrollPane();
         panel_ChatLog = new javax.swing.JPanel();
         panel_Message = new javax.swing.JPanel();
         label_moreFeature = new javax.swing.JLabel();
@@ -468,16 +569,13 @@ public class ClientGUI extends javax.swing.JFrame {
 
         panel_Right.add(panel_topBar);
 
-        scollpane_ChatLog.setBackground(new java.awt.Color(255, 255, 255));
-        scollpane_ChatLog.setBorder(null);
+        scollPanel_ChatLog.setBorder(null);
 
         panel_ChatLog.setBackground(new java.awt.Color(255, 255, 255));
-        panel_ChatLog.setMaximumSize(new java.awt.Dimension(30000, 30000));
-        panel_ChatLog.setPreferredSize(new java.awt.Dimension(600, 100));
         panel_ChatLog.setLayout(new javax.swing.BoxLayout(panel_ChatLog, javax.swing.BoxLayout.Y_AXIS));
-        scollpane_ChatLog.setViewportView(panel_ChatLog);
+        scollPanel_ChatLog.setViewportView(panel_ChatLog);
 
-        panel_Right.add(scollpane_ChatLog);
+        panel_Right.add(scollPanel_ChatLog);
 
         panel_Message.setBackground(new java.awt.Color(255, 255, 255));
         panel_Message.setMaximumSize(new java.awt.Dimension(32767, 60));
@@ -589,7 +687,7 @@ public class ClientGUI extends javax.swing.JFrame {
             System.exit(0);
         }
     }//GEN-LAST:event_formWindowClosing
-
+    //Gửi yêu cầu kết bạn
     private void label_addFriendsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_label_addFriendsMouseClicked
         String userNameNewFriend = JOptionPane.showInputDialog(null, "Please enter new friends's user name", "Add new friend", JOptionPane.INFORMATION_MESSAGE);
         if (userNameNewFriend.equals("")) {
@@ -607,7 +705,7 @@ public class ClientGUI extends javax.swing.JFrame {
             }
         }
     }//GEN-LAST:event_label_addFriendsMouseClicked
-
+    //Cắt chuỗi cho xuống dòng Mess text nếu quá dài
     public String splitMess(String Mess) {
         int charPerLine = 65;
         Mess += " ";
@@ -653,23 +751,34 @@ public class ClientGUI extends javax.swing.JFrame {
             textPane = new JTextPane();
             textPane.setEditable(false);
             StyledDocument doc = textPane.getStyledDocument();
+            //Cắt chuỗi
             String rs = splitMess(Mess);
             Mess = rs.substring(2).trim();
-            //SET STYLE FOR USERNAME
             Style style = textPane.addStyle("I'm a Style", null);
 
             //SET STYLE FOR MESS
+            SimpleAttributeSet aligment = new SimpleAttributeSet();
+            StyleConstants.setAlignment(aligment, StyleConstants.ALIGN_JUSTIFIED);
+            doc.setParagraphAttributes(0, doc.getLength(), aligment, false);
             StyleConstants.setFontFamily(style, "Arial");
             StyleConstants.setBold(style, true);
             StyleConstants.setFontSize(style, 20);
             StyleConstants.setForeground(style, new Color(19, 51, 55));
+
+            if (username.equals(this.userName)) {
+                StyleConstants.setForeground(style, new Color(45, 51, 124));
+            } else {
+                StyleConstants.setForeground(style, new Color(34, 38, 57));
+            }
             try {
                 doc.insertString(doc.getLength(), Mess.trim(), style);
             } catch (BadLocationException e) {
+                e.printStackTrace();
             }
             height = (int) Math.round(textPane.getPreferredSize().getHeight());
             width = (int) Math.round(textPane.getPreferredSize().getWidth());
             textPane.setMaximumSize(textPane.getPreferredSize());
+
         } else if (sign.equals("P")) {
             imgInChat = new ImgInChat();
             ImageIcon imgIcon = new ImageIcon(objMess.getFile());
@@ -696,6 +805,7 @@ public class ClientGUI extends javax.swing.JFrame {
             ava.setPreferredSize(new Dimension(40, height));
             borderAva.setPreferredSize(new Dimension(40, height));
         }
+        pack();
         JLayeredPane lpAva = new JLayeredPane();
         lpAva.setLayout(new OverlayLayout(lpAva));
         lpAva.add(borderAva);
@@ -707,9 +817,8 @@ public class ClientGUI extends javax.swing.JFrame {
         JPanel panelChat = new JPanel();
         panelChat.setLayout(new BoxLayout(panelChat, BoxLayout.X_AXIS));
         panelChat.setBackground(Color.WHITE);
-        //panelChat.setPreferredSize(new Dimension(width + 40, height));
-       // panelChat.setMinimumSize(new Dimension(width + 40, height));
-        panelChat.setMaximumSize(new Dimension(30000, height));
+
+        //panelChat.setMaximumSize(new Dimension(30000, height));
         //====tạo mới jpanel XONG==========
 
         //So sánh căn lề
@@ -718,7 +827,7 @@ public class ClientGUI extends javax.swing.JFrame {
         if (username.equals(this.userName)) {
             panelChat.add(Box.createHorizontalGlue());
             //xử lý add loại mess nào vào
-            
+
             if (sign.equals("M")) {
                 panelChat.add(textPane);
             } else if (sign.equals("P")) {
@@ -740,22 +849,27 @@ public class ClientGUI extends javax.swing.JFrame {
             panelChat.add(Box.createHorizontalGlue());
 
         }
-
+        
         resetPanelListFriends(panelChat);
         return panelChat;
 
     }
 
-    public void hanldeTxtMess(ObjectClients objMess) {
-       
+    public void hanldeMess(ObjectClients objMess) {
+
         JPanel panelChat = new JPanel();
         panelChat = myMess(objMess);
+
         if (panelChat != null) {
+
             panel_ChatLog.add(panelChat);
             panel_ChatLog.add(Box.createVerticalStrut(20));
-        }
-
-        resetPanelListFriends(panel_ChatLog);
+            resetPanelListFriends(panel_ChatLog);           // scrollToBottom(scollPanel_ChatLog);
+            pack();// tự tính toán lại kích thước chuẩn
+            
+            scrollToBottom(scollPanel_ChatLog);
+        } 
+        
     }
 
     private void btn_SendMessageMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_btn_SendMessageMouseClicked
@@ -769,18 +883,28 @@ public class ClientGUI extends javax.swing.JFrame {
     }//GEN-LAST:event_txt_WriteMessageKeyPressed
 
     public void sendMess() {
-//        String messSend = txt_WriteMessage.getText().trim();
-//        if (messSend.equals("")) {
-//            JOptionPane.showMessageDialog(null, "Message emptry!!!", "ERROR!!!", JOptionPane.ERROR_MESSAGE);
-//            return;
-//        }
-//        hanldeTxtMess(messSend);
-//        txt_WriteMessage.setText("");
+        String txtMess = txt_WriteMessage.getText();
+        if(!txtMess.equals(""))
+        {
+            ObjectClients objTxtMess = new ObjectClients();
+            objTxtMess.setStatus("chat");
+            objTxtMess.setMessage("M"+txtMess);
+            objTxtMess.setUserNameSend(this.userName);
+            objTxtMess.setUserNameRecv(currentFriendUserName);
+            try {
+                oos.writeObject(objTxtMess);
+                oos.flush();
+                //Sau khi gửi thì cập nhật lại setUserNameRecv cho handleMess sử lý thêm vào
+                objTxtMess.setUserNameRecv(this.userName);
+                txt_WriteMessage.setText("");
+                hanldeMess(objTxtMess);
+                soundStatus = true;
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
     }
 
-    /**
-     * @param args the command line arguments
-     */
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JLabel boder_label_myAvaProfile;
@@ -813,7 +937,7 @@ public class ClientGUI extends javax.swing.JFrame {
     private javax.swing.JPanel panel_searchFriends;
     private javax.swing.JPanel panel_topBar;
     private javax.swing.JScrollPane scollPane_ListFriends;
-    private javax.swing.JScrollPane scollpane_ChatLog;
+    private javax.swing.JScrollPane scollPanel_ChatLog;
     private javax.swing.JTextField txt_WriteMessage;
     private javax.swing.JTextField txt_searchFriends;
     // End of variables declaration//GEN-END:variables

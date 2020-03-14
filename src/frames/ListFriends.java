@@ -108,10 +108,15 @@ public class ListFriends extends javax.swing.JPanel implements USER {
         this.panel_listFriends = panel_listFriends;
     }
 
-    public void setLabel_notification(JLabel label_notification) {
-        this.label_notification = label_notification;
+    public void setLabel_notification() {
+        this.label_notification.setIcon(new ImageIcon(getClass().getResource("/Image/notification.png")));
     }
 
+    public void removeNotification()
+    {
+        this.label_notification.setIcon(null);
+    }
+    
     public Boolean getNotification() {
         return notification;
     }
@@ -213,7 +218,8 @@ public class ListFriends extends javax.swing.JPanel implements USER {
 
         panel_listFriends.add(panel_infoFriends);
 
-        label_notification.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Image/notification.png"))); // NOI18N
+        label_notification.setMaximumSize(new java.awt.Dimension(20, 60));
+        label_notification.setPreferredSize(new java.awt.Dimension(20, 60));
         panel_listFriends.add(label_notification);
 
         add(panel_listFriends);
