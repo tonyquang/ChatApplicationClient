@@ -6,13 +6,11 @@
 package Client;
 
 import frames.Register;
-import java.awt.Font;
 import java.awt.event.KeyEvent;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
 import javax.swing.ImageIcon;
-import org.jdesktop.xswingx.PromptSupport;
 
 /**
  *

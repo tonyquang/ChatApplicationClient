@@ -48,6 +48,7 @@ public class ListFriends extends javax.swing.JPanel implements USER {
         } else {
             this.label_statusFriend.setForeground(Color.RED);
         }
+        
     }
 
     public void setBgClicked() {

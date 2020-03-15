@@ -26,20 +26,24 @@ public class viewFile extends javax.swing.JPanel {
      */
     private byte[] file;
     private String fileName;
-    public viewFile(byte[] file, String fileName) {
-        this.file = file;
-        this.fileName = fileName;
-        String fN = fileName.substring(1);
-        int index = fN.lastIndexOf("\\");
-        fN = fN.substring(index+1);
-        if(fN.length() <= 25)
-            this.label_fileName.setText(fN);
-        else
-            this.label_fileName.setText(fN.substring(0, 25)+"...");
-    }
+    private String extension;
 
     public viewFile() {
         initComponents();
+    }
+
+    public void setFile(byte[] file, String fileName) {
+        this.file = file;
+        this.fileName = fileName;
+        String fN = fileName.substring(1);
+        this.extension = fN.substring(fN.lastIndexOf(".")+1);
+        //int index = fN.lastIndexOf("\\");
+        // fN = fN.substring(index+1);
+        if (fN.length() <= 25) {
+            this.label_fileName.setText(fN);
+        } else {
+            this.label_fileName.setText(fN.substring(0, 25) + "...");
+        }
     }
 
     /**
@@ -55,23 +59,23 @@ public class viewFile extends javax.swing.JPanel {
         label_fileName = new javax.swing.JLabel();
         label_download = new javax.swing.JLabel();
 
-        setBackground(new java.awt.Color(255, 255, 255));
+        setBackground(new java.awt.Color(220, 220, 220));
+        setBorder(new javax.swing.border.LineBorder(new java.awt.Color(0, 0, 0), 1, true));
+        setMaximumSize(new java.awt.Dimension(252, 50));
+        setPreferredSize(new java.awt.Dimension(252, 50));
         setLayout(new javax.swing.BoxLayout(this, javax.swing.BoxLayout.LINE_AXIS));
 
         jLabel1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Image/file.png"))); // NOI18N
-        jLabel1.setMaximumSize(new java.awt.Dimension(40, 40));
-        jLabel1.setPreferredSize(new java.awt.Dimension(40, 40));
         add(jLabel1);
 
-        label_fileName.setFont(new java.awt.Font("Arial", 1, 12)); // NOI18N
+        label_fileName.setFont(new java.awt.Font("Arial", 1, 14)); // NOI18N
         label_fileName.setText("File Name");
         label_fileName.setMaximumSize(new java.awt.Dimension(180, 40));
         label_fileName.setPreferredSize(new java.awt.Dimension(180, 40));
         add(label_fileName);
 
         label_download.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Image/downloadfile-normal.png"))); // NOI18N
-        label_download.setMaximumSize(new java.awt.Dimension(30, 40));
-        label_download.setPreferredSize(new java.awt.Dimension(30, 40));
+        label_download.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         label_download.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 label_downloadMouseClicked(evt);
@@ -99,17 +103,19 @@ public class viewFile extends javax.swing.JPanel {
             JFileChooser fileChooser = new JFileChooser();
             if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
                 File file = fileChooser.getSelectedFile();
-                try {
-                    FileOutputStream fileOuputStream = new FileOutputStream(file.getAbsolutePath());
-                    fileOuputStream.write(this.file);
-                } catch (FileNotFoundException ex) {
-                    Logger.getLogger(viewFile.class.getName()).log(Level.SEVERE, null, ex);
-                } catch (IOException ex) {
-                    Logger.getLogger(viewFile.class.getName()).log(Level.SEVERE, null, ex);
+                if (!file.getName().equals("")) {
+                    try {
+                        FileOutputStream fileOuputStream = new FileOutputStream(file.getAbsolutePath()+"."+this.extension);
+                        fileOuputStream.write(this.file);
+                    } catch (FileNotFoundException ex) {
+                        Logger.getLogger(viewFile.class.getName()).log(Level.SEVERE, null, ex);
+                    } catch (IOException ex) {
+                        Logger.getLogger(viewFile.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    JOptionPane.showMessageDialog(null, "Save file success", "Save file", JOptionPane.INFORMATION_MESSAGE);
                 }
-                
             }
-            JOptionPane.showMessageDialog(null, "Save file success","Save file",JOptionPane.INFORMATION_MESSAGE);
+           
         }
     }//GEN-LAST:event_label_downloadMouseClicked
 

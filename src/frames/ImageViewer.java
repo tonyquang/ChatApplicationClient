@@ -13,12 +13,12 @@ public class ImageViewer extends javax.swing.JPanel {
 
     public void setImage(ImageIcon image) {
         this.icon = image;
-        if (image.getIconHeight() > 500 || image.getIconWidth() > 500) {
+        if (image.getIconHeight() > 800 || image.getIconWidth() > 800) {
             Image img;
             if (image.getIconWidth() > image.getIconHeight()) {
-                img = image.getImage().getScaledInstance(500, -1, Image.SCALE_SMOOTH);
+                img = image.getImage().getScaledInstance(800, -1, Image.SCALE_SMOOTH);
             } else {
-                img = image.getImage().getScaledInstance(-1, 500, Image.SCALE_SMOOTH);
+                img = image.getImage().getScaledInstance(-1, 800, Image.SCALE_SMOOTH);
             }
             image = new ImageIcon(img);
         }

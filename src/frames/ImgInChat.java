@@ -5,9 +5,11 @@
  */
 package frames;
 
+import Client.ClientGUI;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Image;
+import java.awt.Toolkit;
 import javax.swing.ImageIcon;
 import javax.swing.JPopupMenu;
 
@@ -23,8 +25,8 @@ public class ImgInChat extends javax.swing.JPanel {
     public ImgInChat() {
         initComponents();
     }
-    
-     private boolean isOver = false;
+
+    private boolean isOver = false;
 
     public ImageIcon getImage() {
         return image;
@@ -69,9 +71,10 @@ public class ImgInChat extends javax.swing.JPanel {
         setBackground(new java.awt.Color(255, 255, 255));
         setMaximumSize(new java.awt.Dimension(300, 300));
         setPreferredSize(new java.awt.Dimension(200, 200));
-        setLayout(new javax.swing.BoxLayout(this, javax.swing.BoxLayout.PAGE_AXIS));
 
         label_Img.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        label_Img.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        label_Img.setPreferredSize(new java.awt.Dimension(200, 200));
         label_Img.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseEntered(java.awt.event.MouseEvent evt) {
                 label_ImgMouseEntered(evt);
@@ -83,7 +86,17 @@ public class ImgInChat extends javax.swing.JPanel {
                 label_ImgMouseReleased(evt);
             }
         });
-        add(label_Img);
+
+        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
+        this.setLayout(layout);
+        layout.setHorizontalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(label_Img, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+        );
+        layout.setVerticalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(label_Img, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+        );
     }// </editor-fold>//GEN-END:initComponents
 
     private void label_ImgMouseEntered(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_label_ImgMouseEntered
@@ -102,9 +115,11 @@ public class ImgInChat extends javax.swing.JPanel {
             ImageViewer obj = new ImageViewer();
             obj.setImage(image);
             pop.add(obj);
+            Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
             int w = (int) obj.getPreferredSize().getWidth();
             int h = (int) obj.getPreferredSize().getHeight();
-            pop.show(this, w, h);
+            System.out.println(w+"-"+h);
+            pop.show(this,-((int)screenSize.getWidth() / 2 - w / 2)-20, -((int)screenSize.getHeight() / 2 - h / 2)-100);
         }
     }//GEN-LAST:event_label_ImgMouseReleased
 
