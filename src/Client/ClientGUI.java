@@ -6,11 +6,13 @@
 package Client;
 
 import ClientsObject.ObjectClients;
+import Models.WrapLayout;
 import frames.ImgInChat;
 import frames.ListFriends;
 import frames.viewFile;
 import java.awt.Adjustable;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Image;
@@ -21,11 +23,14 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -89,8 +94,9 @@ public class ClientGUI extends javax.swing.JFrame {
         UIManager.put("PopupMenu.border", BorderFactory.createEmptyBorder());
 
         initComponents();
+        panel_StickerContent.setLayout(new WrapLayout(WrapLayout.LEFT, 0, 10));
         //init popup
-        initPopUpMoreFeture();
+        initPopUp();
 
         try {
             this.sock = new Socket(address, port);
@@ -162,14 +168,9 @@ public class ClientGUI extends javax.swing.JFrame {
                     switch (status) {
                         case "resLogin": {
                             String rs = objServerResp.getMessage();
-                            if (rs.equals("fail")) {
-                                JOptionPane.showMessageDialog(null, "Username or Password wrong, Please try again!!!", "Login Fail", JOptionPane.ERROR_MESSAGE);
-                                Login login = new Login();
-                                login.setVisible(true);
-                            } else {
+                            if (rs.equals("success")) {
                                 JOptionPane.showMessageDialog(null, "Login Success! Welcome to Meow~~~ App", "Login success", JOptionPane.INFORMATION_MESSAGE);
                                 this.clientGUI.setVisible(true);
-
                                 Thread t = new Thread(new Runnable() {
                                     @Override
                                     public void run() {
@@ -178,11 +179,18 @@ public class ClientGUI extends javax.swing.JFrame {
                                         } catch (InterruptedException ex) {
                                             Logger.getLogger(ClientGUI.class.getName()).log(Level.SEVERE, null, ex);
                                         }
-                                        ListFriends firstFriend = (ListFriends) panel_ListFriends.getComponent(0);
-                                        initChat(firstFriend);
+                                        if (panel_ListFriends.getComponentCount() > 0) {
+                                            ListFriends firstFriend = (ListFriends) panel_ListFriends.getComponent(0);
+                                            initChat(firstFriend);
+                                        }
                                     }
                                 });
                                 t.run();
+
+                            } else {
+                                JOptionPane.showMessageDialog(null, rs, "Login fail", JOptionPane.ERROR_MESSAGE);
+                                Login login = new Login();
+                                login.setVisible(true);
                             }
                             break;
                         }
@@ -207,7 +215,10 @@ public class ClientGUI extends javax.swing.JFrame {
                         //Nhận phản hồi thêm bạn bè hoặc được bạn bè thêm    
                         case "resAddfriends": {
                             if (objServerResp.getMessage().equals("success")) {
-
+                                if (panel_ListFriends.getComponentCount() == 0) {
+                                    currentFriendUserName = userName;
+                                    activeChat(fullName, userStatus, imgIcon);
+                                }
                                 ListFriends addFriend = new ListFriends();
                                 addFriend.set(imgIcon, userName, fullName, userStatus);
                                 addFriend.setVisible(true);
@@ -215,7 +226,7 @@ public class ClientGUI extends javax.swing.JFrame {
                                 addMouseEventListFriends(addFriend, userName.trim(), fullName, userStatus, imgIcon);
 
                                 panel_ListFriends.add(addFriend);
-                                resetPanelListFriends(panel_ListFriends);
+                                resetPanel(panel_ListFriends);
 
                                 listFriends.put(userName, addFriend);
 
@@ -229,7 +240,10 @@ public class ClientGUI extends javax.swing.JFrame {
                         }
                         case "pushfriendtolist": {
                             if (objServerResp.getMessage().equals("success")) {
-
+                                if (panel_ListFriends.getComponentCount() == 0) {
+                                    currentFriendUserName = userName;
+                                    activeChat(fullName, userStatus, imgIcon);
+                                }
                                 ListFriends addFriend = new ListFriends();
                                 addFriend.set(imgIcon, userName, fullName, userStatus);
                                 addFriend.setVisible(true);
@@ -237,7 +251,7 @@ public class ClientGUI extends javax.swing.JFrame {
                                 addMouseEventListFriends(addFriend, userName.trim(), fullName, userStatus, imgIcon);
 
                                 panel_ListFriends.add(addFriend);
-                                resetPanelListFriends(panel_ListFriends);
+                                resetPanel(panel_ListFriends);
 
                                 listFriends.put(userName, addFriend);
 
@@ -252,7 +266,7 @@ public class ClientGUI extends javax.swing.JFrame {
                             if (!objServerResp.getMessage().equals("pkg_end")) {
                                 hanldeMess(objServerResp, "resMess");
                             } else {
-                                resetPanelListFriends(panel_ChatLog);
+                                resetPanel(panel_ChatLog);
                             }
                             break;
                         }
@@ -265,6 +279,11 @@ public class ClientGUI extends javax.swing.JFrame {
                                 hanldeMess(objServerResp, "chat");
                             }
                             break;
+                        }
+                        case "stop": {
+                            JOptionPane.showMessageDialog(null, "The server forced you to stop! You'll exit now!");
+                            this.sock.close();
+                            System.exit(0);
                         }
                     }
 
@@ -298,7 +317,7 @@ public class ClientGUI extends javax.swing.JFrame {
     }
 
     //Vẽ lại JPanel
-    public void resetPanelListFriends(JPanel jpanel) {
+    public void resetPanel(JPanel jpanel) {
         jpanel.revalidate();
         jpanel.repaint();
     }
@@ -362,15 +381,13 @@ public class ClientGUI extends javax.swing.JFrame {
             public void mousePressed(MouseEvent e) {
                 if (!friendUserName.trim().equals(currentFriendUserName.trim())) {
                     showLoading();
-                    label_yourFriendName.setText(friendName);
-                    setUserStatus(friendStatus);
-                    setAva(label_avaYourFriends1, imgIcon, 40);
+                    activeChat(friendName, friendStatus, imgIcon);
                     listFriends.get(friendUserName).setBgClicked();
                     listFriends.get(currentFriendUserName.trim()).RemoveBg();
                     currentFriendUserName = friendUserName;
                     listFriends.get(currentFriendUserName.trim()).removeNotification();
                     panel_ChatLog.removeAll();
-                    resetPanelListFriends(panel_ChatLog);
+                    resetPanel(panel_ChatLog);
                     getMess(currentFriendUserName);//yêu cầu lấy tin nhắn của bạn bè khi click vào
 
                 }
@@ -380,16 +397,22 @@ public class ClientGUI extends javax.swing.JFrame {
         });
     }
 
+    public void activeChat(String Name, String status, ImageIcon imgIcon) {
+        label_yourFriendName.setText(Name);
+        setUserStatus(status);
+        setAva(label_avaYourFriends1, imgIcon, 40);
+    }
+
     public void showLoading() {
         Thread tLoading = new Thread(new Runnable() {
             @Override
             public void run() {
-                loading.add(loading_icon);
-                loading.show(scollPanel_ChatLog, 0, 0);
                 try {
+                    loading.add(loading_icon);
+                    loading.show(scollPanel_ChatLog, 0, 0);
                     Thread.sleep(2000);
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(ClientGUI.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
                 }
                 loading.setVisible(false);
             }
@@ -432,7 +455,7 @@ public class ClientGUI extends javax.swing.JFrame {
     public void updateStatusFriend(String friendUserName, String status) {
         ListFriends f = listFriends.get(friendUserName);
         f.updateStatus(status);
-        resetPanelListFriends(panel_ListFriends);
+        resetPanel(panel_ListFriends);
     }
 
     @SuppressWarnings("unchecked")
@@ -446,7 +469,15 @@ public class ClientGUI extends javax.swing.JFrame {
         label_popup_sticker = new javax.swing.JLabel();
         loading = new javax.swing.JPopupMenu();
         loading_icon = new javax.swing.JPanel();
-        jLabel2 = new javax.swing.JLabel();
+        label_loading = new javax.swing.JLabel();
+        popup_emoji = new javax.swing.JPopupMenu();
+        panel_emoji = new javax.swing.JPanel();
+        popup_sticker = new javax.swing.JPopupMenu();
+        splitPane_sticker = new javax.swing.JSplitPane();
+        scollPane_StickerTitle = new javax.swing.JScrollPane();
+        panel_StickerTitle = new javax.swing.JPanel();
+        scollPanel_StickerContent = new javax.swing.JScrollPane();
+        panel_StickerContent = new javax.swing.JPanel();
         panel_Main = new javax.swing.JPanel();
         panel_Left = new javax.swing.JPanel();
         panel_Profile = new javax.swing.JPanel();
@@ -479,6 +510,7 @@ public class ClientGUI extends javax.swing.JFrame {
         label_moreFeature = new javax.swing.JLabel();
         panel_WriteMessage = new javax.swing.JPanel();
         txt_WriteMessage = new javax.swing.JTextField();
+        btn_icon = new javax.swing.JLabel();
         btn_SendMessage = new javax.swing.JLabel();
 
         popup_MoreFe.setBackground(new java.awt.Color(255, 255, 255));
@@ -533,6 +565,9 @@ public class ClientGUI extends javax.swing.JFrame {
         label_popup_sticker.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         label_popup_sticker.setOpaque(true);
         label_popup_sticker.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                label_popup_stickerMouseClicked(evt);
+            }
             public void mouseEntered(java.awt.event.MouseEvent evt) {
                 label_popup_stickerMouseEntered(evt);
             }
@@ -543,6 +578,7 @@ public class ClientGUI extends javax.swing.JFrame {
         panel_popup.add(label_popup_sticker);
 
         loading.setBackground(new java.awt.Color(255, 255, 255));
+        loading.setBorder(null);
         loading.setMinimumSize(new java.awt.Dimension(800, 495));
         loading.setPreferredSize(new java.awt.Dimension(800, 495));
 
@@ -552,12 +588,63 @@ public class ClientGUI extends javax.swing.JFrame {
         loading_icon.setPreferredSize(new java.awt.Dimension(800, 495));
         loading_icon.setLayout(new javax.swing.BoxLayout(loading_icon, javax.swing.BoxLayout.Y_AXIS));
 
-        jLabel2.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        jLabel2.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Image/Loading.gif"))); // NOI18N
-        jLabel2.setMaximumSize(new java.awt.Dimension(800, 495));
-        jLabel2.setMinimumSize(new java.awt.Dimension(800, 495));
-        jLabel2.setPreferredSize(new java.awt.Dimension(800, 495));
-        loading_icon.add(jLabel2);
+        label_loading.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        label_loading.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Image/Loading.gif"))); // NOI18N
+        label_loading.setMaximumSize(new java.awt.Dimension(800, 495));
+        label_loading.setMinimumSize(new java.awt.Dimension(800, 495));
+        label_loading.setPreferredSize(new java.awt.Dimension(800, 495));
+        loading_icon.add(label_loading);
+
+        panel_emoji.setMaximumSize(new java.awt.Dimension(260, 260));
+        panel_emoji.setMinimumSize(new java.awt.Dimension(260, 260));
+        panel_emoji.setPreferredSize(new java.awt.Dimension(260, 260));
+        panel_emoji.setLayout(new java.awt.GridLayout(6, 6, 5, 5));
+
+        splitPane_sticker.setBackground(new java.awt.Color(255, 255, 255));
+        splitPane_sticker.setBorder(null);
+        splitPane_sticker.setDividerLocation(45);
+        splitPane_sticker.setOrientation(javax.swing.JSplitPane.VERTICAL_SPLIT);
+        splitPane_sticker.setMaximumSize(new java.awt.Dimension(320, 370));
+        splitPane_sticker.setMinimumSize(new java.awt.Dimension(320, 370));
+        splitPane_sticker.setPreferredSize(new java.awt.Dimension(320, 370));
+
+        scollPane_StickerTitle.setVerticalScrollBarPolicy(javax.swing.ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+        scollPane_StickerTitle.setMaximumSize(new java.awt.Dimension(0, 0));
+        scollPane_StickerTitle.setMinimumSize(new java.awt.Dimension(0, 0));
+        scollPane_StickerTitle.setPreferredSize(new java.awt.Dimension(0, 0));
+
+        panel_StickerTitle.setBackground(new java.awt.Color(255, 255, 255));
+        panel_StickerTitle.setMaximumSize(new java.awt.Dimension(32767, 40));
+        panel_StickerTitle.setMinimumSize(new java.awt.Dimension(0, 0));
+        panel_StickerTitle.setPreferredSize(new java.awt.Dimension(0, 0));
+        panel_StickerTitle.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 5, 2));
+        scollPane_StickerTitle.setViewportView(panel_StickerTitle);
+
+        splitPane_sticker.setTopComponent(scollPane_StickerTitle);
+
+        scollPanel_StickerContent.setBorder(null);
+
+        panel_StickerContent.setBackground(new java.awt.Color(255, 255, 255));
+        panel_StickerContent.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            public void mouseMoved(java.awt.event.MouseEvent evt) {
+                panel_StickerContentMouseMoved(evt);
+            }
+        });
+
+        javax.swing.GroupLayout panel_StickerContentLayout = new javax.swing.GroupLayout(panel_StickerContent);
+        panel_StickerContent.setLayout(panel_StickerContentLayout);
+        panel_StickerContentLayout.setHorizontalGroup(
+            panel_StickerContentLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 320, Short.MAX_VALUE)
+        );
+        panel_StickerContentLayout.setVerticalGroup(
+            panel_StickerContentLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 320, Short.MAX_VALUE)
+        );
+
+        scollPanel_StickerContent.setViewportView(panel_StickerContent);
+
+        splitPane_sticker.setRightComponent(scollPanel_StickerContent);
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         setTitle("Meoww~~ App Client");
@@ -774,7 +861,7 @@ public class ClientGUI extends javax.swing.JFrame {
             panel_WriteMessageLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(panel_WriteMessageLayout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(txt_WriteMessage, javax.swing.GroupLayout.DEFAULT_SIZE, 706, Short.MAX_VALUE)
+                .addComponent(txt_WriteMessage, javax.swing.GroupLayout.DEFAULT_SIZE, 707, Short.MAX_VALUE)
                 .addContainerGap())
         );
         panel_WriteMessageLayout.setVerticalGroup(
@@ -786,6 +873,22 @@ public class ClientGUI extends javax.swing.JFrame {
         );
 
         panel_Message.add(panel_WriteMessage);
+
+        btn_icon.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Image/btn_icon_normal.png"))); // NOI18N
+        btn_icon.setToolTipText("Icon");
+        btn_icon.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btn_icon.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                btn_iconMouseClicked(evt);
+            }
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                btn_iconMouseEntered(evt);
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                btn_iconMouseExited(evt);
+            }
+        });
+        panel_Message.add(btn_icon);
 
         btn_SendMessage.setIcon(new javax.swing.ImageIcon(getClass().getResource("/Image/send.png"))); // NOI18N
         btn_SendMessage.setToolTipText("Send Message");
@@ -910,55 +1013,78 @@ public class ClientGUI extends javax.swing.JFrame {
         String Mess = objMess.getMessage();
         String sign = Character.toString(Mess.charAt(0));
         String username = objMess.getUserNameRecv().trim();
+
         JTextPane textPane = null;
+
         ImgInChat imgInChat = null;
         viewFile vF = null;
+        JLabel icon = new JLabel();
+
         int height = 40;
         int width = 200;
         //Xử lý gói message
-        if (sign.equals("M")) {
-            textPane = new JTextPane();
-            textPane.setEditable(false);
-            StyledDocument doc = textPane.getStyledDocument();
-            //Cắt chuỗi
-            String rs = splitMess(Mess);
-            Mess = rs.substring(2).trim();
-            Style style = textPane.addStyle("I'm a Style", null);
+        switch (sign) {
+            case "M": {
+                textPane = new JTextPane();
+                textPane.setEditable(false);
+                StyledDocument doc = textPane.getStyledDocument();
+                //Cắt chuỗi
+                String rs = splitMess(Mess);
+                Mess = rs.substring(2).trim();
+                Style style = textPane.addStyle("I'm a Style", null);
 
-            //SET STYLE FOR MESS
-            SimpleAttributeSet aligment = new SimpleAttributeSet();
-            StyleConstants.setAlignment(aligment, StyleConstants.ALIGN_JUSTIFIED);
-            doc.setParagraphAttributes(0, doc.getLength(), aligment, false);
-            StyleConstants.setFontFamily(style, "Arial");
-            StyleConstants.setBold(style, true);
-            StyleConstants.setFontSize(style, 20);
-            StyleConstants.setForeground(style, new Color(19, 51, 55));
+                //SET STYLE FOR MESS
+                SimpleAttributeSet aligment = new SimpleAttributeSet();
+                StyleConstants.setAlignment(aligment, StyleConstants.ALIGN_JUSTIFIED);
+                doc.setParagraphAttributes(0, doc.getLength(), aligment, false);
+                StyleConstants.setFontFamily(style, "Arial");
+                StyleConstants.setBold(style, true);
+                StyleConstants.setFontSize(style, 20);
+                StyleConstants.setForeground(style, new Color(19, 51, 55));
 
-            if (username.equals(this.userName)) {
-                StyleConstants.setForeground(style, new Color(45, 51, 124));
-            } else {
-                StyleConstants.setForeground(style, new Color(34, 38, 57));
+                if (username.equals(this.userName)) {
+                    StyleConstants.setForeground(style, new Color(45, 51, 124));
+                } else {
+                    StyleConstants.setForeground(style, new Color(66, 135, 245));
+                }
+                try {
+                    doc.insertString(doc.getLength(), Mess.trim(), style);
+                } catch (BadLocationException e) {
+                    e.printStackTrace();
+                }
+                height = (int) Math.round(textPane.getPreferredSize().getHeight());
+                width = (int) Math.round(textPane.getPreferredSize().getWidth());
+                textPane.setMaximumSize(textPane.getPreferredSize());
+                break;
             }
-            try {
-                doc.insertString(doc.getLength(), Mess.trim(), style);
-            } catch (BadLocationException e) {
-                e.printStackTrace();
+            case "P": {
+                imgInChat = new ImgInChat();
+                ImageIcon imgIcon = new ImageIcon(objMess.getFile());
+                if (imgIcon != null) {
+                    imgInChat.setPhoto(imgIcon, panel_ChatLog);
+                }
+                imgInChat.setVisible(true);
+                break;
             }
-            height = (int) Math.round(textPane.getPreferredSize().getHeight());
-            width = (int) Math.round(textPane.getPreferredSize().getWidth());
-            textPane.setMaximumSize(textPane.getPreferredSize());
+            case "F": {
+                vF = new viewFile();
+                vF.setFile(objMess.getFile(), Mess);
+                vF.setVisible(true);
+                break;
+            }
+            case "I": {
+                icon.setPreferredSize(new Dimension(40, 40));
+                String path = "/emoji/" + Mess.substring(1);
+                icon.setIcon(new ImageIcon(getClass().getResource(path)));
+                break;
+            }
+            case "S": {
+                icon.setPreferredSize(new Dimension(150, 150));
+                String path = "/sticker/" + Mess.substring(1);
 
-        } else if (sign.equals("P")) {
-            imgInChat = new ImgInChat();
-            ImageIcon imgIcon = new ImageIcon(objMess.getFile());
-            if (imgIcon != null) {
-                imgInChat.setPhoto(imgIcon);
+                icon.setIcon(new ImageIcon(getClass().getResource(path)));
+                break;
             }
-            imgInChat.setVisible(true);
-        } else if (sign.equals("F")) {
-            vF = new viewFile();
-            vF.setFile(objMess.getFile(), Mess);
-            vF.setVisible(true);
         }
         //Xử lý gói message XONG
 
@@ -1005,6 +1131,8 @@ public class ClientGUI extends javax.swing.JFrame {
                 panelChat.add(imgInChat);
             } else if (sign.equals("F")) {
                 panelChat.add(vF);
+            } else if (sign.equals("I") || sign.equals("S")) {
+                panelChat.add(icon);
             }
 //            panelChat.add(Box.createHorizontalStrut(10));
             panelChat.add(lpAva);
@@ -1019,16 +1147,19 @@ public class ClientGUI extends javax.swing.JFrame {
                 panelChat.add(imgInChat);
             } else if (sign.equals("F")) {
                 panelChat.add(vF);
+            } else if (sign.equals("I") || sign.equals("S")) {
+                panelChat.add(icon);
             }
             panelChat.add(Box.createHorizontalGlue());
 
         }
 
-        resetPanelListFriends(panelChat);
+        resetPanel(panelChat);
         return panelChat;
 
     }
 
+    //Sử lý tin nhắn
     public void hanldeMess(ObjectClients objMess, String action) {
 
         JPanel panelChat = new JPanel();
@@ -1038,10 +1169,40 @@ public class ClientGUI extends javax.swing.JFrame {
             panel_ChatLog.add(panelChat);
             panel_ChatLog.add(Box.createVerticalStrut(20));
             if (action.equals("chat")) {
-                resetPanelListFriends(panel_ChatLog); // scrollToBottom(scollPanel_ChatLog);
+                resetPanel(panel_ChatLog); // scrollToBottom(scollPanel_ChatLog);
             }
             pack();// tự tính toán lại kích thước chuẩn
             scrollToBottom(scollPanel_ChatLog);
+        }
+
+    }
+
+    public void initEmoji() {
+        //File folder = (new File(getClass().getResource("/my/path").toURI())).listFiles();
+
+        try {
+            File[] listEmoji = (new File(getClass().getResource("/emoji").toURI())).listFiles();
+            for (File e : listEmoji) {
+                JLabel label_emoji = new JLabel();
+                label_emoji.setPreferredSize(new Dimension(40, 40));
+                label_emoji.setIcon(new ImageIcon(e.getAbsolutePath()));
+                label_emoji.setCursor(new Cursor(12));
+                label_emoji.setName(e.getAbsolutePath());
+                label_emoji.addMouseListener(new MouseAdapter() {
+
+                    @Override
+                    public void mouseClicked(MouseEvent e) {
+                        JLabel label = (JLabel) e.getComponent();
+                        handleIS(label, "I");
+                    }
+
+                });
+                panel_emoji.add(label_emoji);
+            }
+            resetPanel(panel_emoji);
+            popup_emoji.add(panel_emoji);
+        } catch (URISyntaxException ex) {
+            Logger.getLogger(ClientGUI.class.getName()).log(Level.SEVERE, null, ex);
         }
 
     }
@@ -1163,6 +1324,26 @@ public class ClientGUI extends javax.swing.JFrame {
 
     }//GEN-LAST:event_label_popup_imgMouseClicked
 
+    private void btn_iconMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_btn_iconMouseClicked
+        popup_emoji.show(btn_icon, -240, -270);
+    }//GEN-LAST:event_btn_iconMouseClicked
+
+    private void btn_iconMouseEntered(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_btn_iconMouseEntered
+        this.btn_icon.setIcon(new ImageIcon(getClass().getResource("/Image/btn_icon_hover.png")));
+    }//GEN-LAST:event_btn_iconMouseEntered
+
+    private void btn_iconMouseExited(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_btn_iconMouseExited
+        this.btn_icon.setIcon(new ImageIcon(getClass().getResource("/Image/btn_icon_normal.png")));
+    }//GEN-LAST:event_btn_iconMouseExited
+
+    private void label_popup_stickerMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_label_popup_stickerMouseClicked
+        popup_sticker.show(label_moreFeature, 0, -365);
+    }//GEN-LAST:event_label_popup_stickerMouseClicked
+
+    private void panel_StickerContentMouseMoved(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_panel_StickerContentMouseMoved
+        // TODO add your handling code here:
+    }//GEN-LAST:event_panel_StickerContentMouseMoved
+
     //Đọc file to byte[]
     public byte[] readBytesFromFile(File file) {
 
@@ -1214,9 +1395,100 @@ public class ClientGUI extends javax.swing.JFrame {
         }
     }
 
-    public void initPopUpMoreFeture() {
+    public void initSticker() {
+
+        try {
+            File[] dir = (new File(getClass().getResource("/sticker").toURI())).listFiles();
+            for (File f : dir) {
+                JLabel labelTitleSticker = new JLabel();
+                labelTitleSticker.setPreferredSize(new Dimension(40, 40));
+                String stickerName = f.getName();
+                String path = f.getAbsolutePath() + "\\" + stickerName + ".png";
+                labelTitleSticker.setIcon(new ImageIcon(path));
+                labelTitleSticker.setCursor(new Cursor(12));
+
+                labelTitleSticker.addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseClicked(MouseEvent e) {
+                        setSticker(stickerName);
+                    }
+
+                });
+
+                panel_StickerTitle.add(labelTitleSticker);
+            }
+            resetPanel(panel_StickerTitle);
+        } catch (URISyntaxException ex) {
+            Logger.getLogger(ClientGUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    //Xử lý gửi sticker hoặc icon
+    public void handleIS(JLabel label, String type) {
+        String Path = label.getName();
+        String Name = Path.substring(Path.lastIndexOf("\\") + 1);
+
+        ObjectClients objIcon = new ObjectClients();
+        objIcon.setStatus("chat");
+
+        objIcon.setMessage(type + Name);
+        objIcon.setUserNameSend(userName);
+        objIcon.setUserNameRecv(currentFriendUserName);
+        try {
+            oos.writeObject(objIcon);
+            oos.flush();
+            objIcon.setUserNameRecv(userName);
+            hanldeMess(objIcon, "chat");
+        } catch (IOException ex) {
+            Logger.getLogger(ClientGUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    public void setSticker(String stickerName) {
+        panel_StickerContent.removeAll();
+        try {
+            String path = "/sticker/" + stickerName + "/";
+            File[] listSticker = (new File(getClass().getResource(path).toURI())).listFiles(new FilenameFilter() {
+                @Override
+                public boolean accept(File dir, String name) {
+                    if (name.equals(stickerName + ".png")) {
+                        return false;
+                    }
+                    return true;
+                }
+            ;
+            });
+            for (File f : listSticker) {
+                JLabel labelSticker = new JLabel();
+                labelSticker.setPreferredSize(new Dimension(100, 100));
+                ImageIcon imgIcon = new ImageIcon(f.getAbsolutePath());
+                Image img = imgIcon.getImage().getScaledInstance(100, -1, Image.SCALE_SMOOTH);
+                labelSticker.setIcon(new ImageIcon(img));
+                labelSticker.setCursor(new Cursor(12));
+                labelSticker.setName(f.getAbsolutePath());
+                labelSticker.addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseClicked(MouseEvent e) {
+                        JLabel label = (JLabel) e.getComponent();
+                        handleIS(label, "S" + stickerName + "/");
+                    }
+
+                });
+                panel_StickerContent.add(labelSticker);
+            }
+            resetPanel(panel_StickerContent);
+            popup_sticker.add(splitPane_sticker);
+        } catch (URISyntaxException ex) {
+            Logger.getLogger(ClientGUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    public void initPopUp() {
         //popup_MoreFe.setBackground(Color.red);
         popup_MoreFe.add(panel_popup);
+        initEmoji();
+        initSticker();
+        setSticker("quoobee");
     }
 
 
@@ -1224,13 +1496,14 @@ public class ClientGUI extends javax.swing.JFrame {
     private javax.swing.JLabel boder_label_myAvaProfile;
     private javax.swing.JLabel border_label_avaYourFriends;
     private javax.swing.JLabel btn_SendMessage;
-    private javax.swing.JLabel jLabel2;
+    private javax.swing.JLabel btn_icon;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel label_addFriends;
     private javax.swing.JLabel label_avaYourFriends1;
+    private javax.swing.JLabel label_loading;
     private javax.swing.JLabel label_moreFeature;
     private javax.swing.JLabel label_myAvaProfile1;
     private javax.swing.JLabel label_myName;
@@ -1252,14 +1525,22 @@ public class ClientGUI extends javax.swing.JFrame {
     private javax.swing.JPanel panel_Message;
     private javax.swing.JPanel panel_Profile;
     private javax.swing.JPanel panel_Right;
+    private javax.swing.JPanel panel_StickerContent;
+    private javax.swing.JPanel panel_StickerTitle;
     private javax.swing.JPanel panel_WriteMessage;
+    private javax.swing.JPanel panel_emoji;
     private javax.swing.JPanel panel_line;
     private javax.swing.JPanel panel_popup;
     private javax.swing.JPanel panel_searchFriends;
     private javax.swing.JPanel panel_topBar;
     private javax.swing.JPopupMenu popup_MoreFe;
+    private javax.swing.JPopupMenu popup_emoji;
+    private javax.swing.JPopupMenu popup_sticker;
     private javax.swing.JScrollPane scollPane_ListFriends;
+    private javax.swing.JScrollPane scollPane_StickerTitle;
     private javax.swing.JScrollPane scollPanel_ChatLog;
+    private javax.swing.JScrollPane scollPanel_StickerContent;
+    private javax.swing.JSplitPane splitPane_sticker;
     private javax.swing.JTextField txt_WriteMessage;
     private javax.swing.JTextField txt_searchFriends;
     // End of variables declaration//GEN-END:variables

@@ -11,6 +11,7 @@ import java.awt.Dimension;
 import java.awt.Image;
 import java.awt.Toolkit;
 import javax.swing.ImageIcon;
+import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 
 /**
@@ -22,6 +23,7 @@ public class ImgInChat extends javax.swing.JPanel {
     /**
      * Creates new form ImgInChat
      */
+    JPanel panel_ChatLog = null;
     public ImgInChat() {
         initComponents();
     }
@@ -38,8 +40,9 @@ public class ImgInChat extends javax.swing.JPanel {
 
     private ImageIcon image;
 
-    public void setPhoto(ImageIcon image) {
+    public void setPhoto(ImageIcon image, JPanel panel) {
         this.image = image;
+        this.panel_ChatLog = panel;
         Image img;
         if (image.getIconHeight() > 200 || image.getIconWidth() > 200) {
             if (image.getIconWidth() > image.getIconHeight()) {
@@ -119,7 +122,8 @@ public class ImgInChat extends javax.swing.JPanel {
             int w = (int) obj.getPreferredSize().getWidth();
             int h = (int) obj.getPreferredSize().getHeight();
             System.out.println(w+"-"+h);
-            pop.show(this,-((int)screenSize.getWidth() / 2 - w / 2)-20, -((int)screenSize.getHeight() / 2 - h / 2)-100);
+//            pop.show(this,-((int)screenSize.getWidth() / 2 - w / 2)-20, -((int)screenSize.getHeight() / 2 - h / 2)-100);
+            pop.show(panel_ChatLog,0,0);
         }
     }//GEN-LAST:event_label_ImgMouseReleased
 
